@@ -199,7 +199,6 @@ const propertySchema = new mongoose.Schema({
         type: Date 
     },
 
-    // Commission/Management Info (Admin-only)
     managementInfo: {
         commissionRate: {
             type: Number,

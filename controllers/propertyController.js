@@ -4,32 +4,64 @@ const History = require('../models/historyModel');
 const User = require('../models/userModel');
 
 
+// Get all properties without any checks but with visibility control
+const handleShowAllPropertiesToTenant = async (req, res) => { 
+    try {
+        const properties = await Property.find({ isActive: true })
+        .select('-landlordInfo -managementInfo -emergencyContact -additionalInfo -pendingRequests -approvedRequests')
+    res.status(200).json({
+        success: true,
+        count: properties.length,
+        properties
+    });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+};
+
+const handleShowPropertiesToTenantById = async (req, res) => { 
+    try {
+        const { id } = req.params;
+        const property = await Property.findById(id)
+        .select('-landlordInfo -managementInfo -emergencyContact -additionalInfo -pendingRequests -approvedRequests');
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found"
+            });
+        }
+        res.status(200).json({
+            success: true,
+            property
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+};
+
 // GET ALL PROPERTY
 const handleGetAllProperty = async (req, res) => {
     try {
         // Check if user is admin
-        const isAdmin = req.user?.role === 'admin';
+        const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
         
-        let properties;
-        if (isAdmin) {
-            // Admin sees all properties with landlord info
-            properties = await Property.find({ isActive: true })
-                .populate('listedBy', 'name email')
-                .populate('admin', 'name email')
-                .populate('currentTenant', 'name email phone');
-            
-            properties = properties.map(property => property.toAdminJSON());
-        } else {
-            // Regular users see properties without landlord info
-            properties = await Property.find({ 
-                isActive: true, 
-                status: 'available' 
-            })
-                .select('-landlordInfo -managementInfo -pendingRequests -approvedRequests')
-                .populate('listedBy', 'name');
-            
-            properties = properties.map(property => property.toPublicJSON());
+        if (!isAdmin) {
+            return res.status(403).json({ 
+                success: false, 
+                message: "Only admins can access all properties" 
+            });
         }
+
+        const properties = await Property.find({ isActive: true })
+            .populate('listedBy', 'name email')
+            .populate('admin', 'superAdmin name email')
+            .populate('currentTenant', 'name email phone');
 
         res.status(200).json({
             success: true,
@@ -360,31 +392,21 @@ const handlePropertyListing = async (req, res) => {
     }
 };
 
-// User view property by ID (with visibility control)
+// User view property by ID (Admin only)
 const handleViewPropertyById = async (req, res) => {
     try {
         const { id } = req.params;
-        const isAdmin = req.user?.role === 'admin';
+        const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
         
-        let property;
-        if (isAdmin) {
-            property = await Property.findById(id)
-                .populate('listedBy', 'name email')
-                .populate('admin', 'name email')
-                .populate('currentTenant', 'name email phone');
-            
-            if (property) {
-                property = property.toAdminJSON();
-            }
-        } else {
-            property = await Property.findById(id)
-                .select('-landlordInfo -managementInfo -pendingRequests -approvedRequests')
-                .populate('listedBy', 'name');
-            
-            if (property) {
-                property = property.toPublicJSON();
-            }
+        if (!isAdmin) {
+            return res.status(403).json({ 
+                success: false, 
+                message: "Only admins can view property details" 
+            });
         }
+        
+        const property = await Property.findById(id)
+            .populate('listedBy', 'name email');
 
         if (!property) {
             return res.status(404).json({ 
@@ -392,9 +414,6 @@ const handleViewPropertyById = async (req, res) => {
                 message: "Property not found" 
             });
         }
-
-        // Increment view count
-        await Property.findByIdAndUpdate(id, { $inc: { views: 1 } });
 
         res.status(200).json({
             success: true,
@@ -647,47 +666,6 @@ const handleSearchPropertiesByLandlord = async (req, res) => {
     }
 };
 
-// Update landlord verification status (Admin only)
-const handleUpdateLandlordVerification = async (req, res) => {
-    try {
-        const { propertyId } = req.params;
-        const { verified } = req.body;
-        
-        // Check if user is admin
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ 
-                success: false, 
-                message: "Only admins can update verification status" 
-            });
-        }
-
-        const property = await Property.findById(propertyId);
-        
-        if (!property) {
-            return res.status(404).json({ 
-                success: false, 
-                message: "Property not found" 
-            });
-        }
-
-        property.landlordInfo.verified = verified === true;
-        property.landlordInfo.verifiedBy = req.user._id;
-        property.landlordInfo.verifiedAt = new Date();
-        
-        await property.save();
-
-        res.status(200).json({
-            success: true,
-            message: `Landlord verification ${verified ? 'approved' : 'revoked'}`,
-            landlord: property.landlordInfo
-        });
-    } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
-        });
-    }
-};
 
 
 
@@ -809,11 +787,13 @@ const getFavourite = async (req, res) => {
 module.exports = {
     handlePropertyListing,
     handleGetAllProperty,
+    handleShowAllPropertiesToTenant,
+    handleShowPropertiesToTenantById,
+    handleGetLandlordInfoByPropertyId,
     handleViewPropertyById,
     handleUpdateAPropertyById,
     handleGetLandlordInfoByPropertyId,
     handleSearchPropertiesByLandlord,
-    handleUpdateLandlordVerification,
     deletePropertyById,
     addFavourite,
     removeFavourite,
