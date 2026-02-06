@@ -90,7 +90,7 @@ const handlePropertyListing = async (req, res) => {
             });
         }
 
-        // Extract property and landlord data from request
+        // Extract ALL fields from request body
         const {
             // Property Information
             title,
@@ -102,8 +102,9 @@ const handlePropertyListing = async (req, res) => {
             country,
             apartmentType,
             unitNumber,
+            apartmentCount,
             
-            // Features
+            // Features (will be converted to nested object)
             bedrooms,
             bathrooms,
             parking,
@@ -111,7 +112,6 @@ const handlePropertyListing = async (req, res) => {
             toilet,
             amenities,
             extras,
-            apartmentCount,
             
             // Landlord/House Owner Information
             landlordFullName,
@@ -152,6 +152,14 @@ const handlePropertyListing = async (req, res) => {
             
         } = req.body;
 
+        // Validate required fields
+        if (!title || !description || !price || !address || !city || !state || !apartmentType) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required property fields: title, description, price, address, city, state, apartmentType"
+            });
+        }
+
         // Validate required landlord information
         if (!landlordFullName || !landlordPhone) {
             return res.status(400).json({
@@ -167,15 +175,15 @@ const handlePropertyListing = async (req, res) => {
             });
         }
 
-        // Parse features as object
+        // Parse features as nested object (matches schema)
         const features = {
             bedrooms: parseInt(bedrooms) || 0,
             bathrooms: parseInt(bathrooms) || 1,
             parking: parking === 'true' || parking === true,
             kitchen: kitchen === 'true' || kitchen === true,
             toilet: parseInt(toilet) || 0,
-            amenities: amenities ? (Array.isArray(amenities) ? amenities : [amenities]) : [],
-            extras: extras ? (Array.isArray(extras) ? extras : [extras]) : []
+            amenities: amenities ? (typeof amenities === 'string' ? amenities.split(',') : [].concat(amenities)) : [],
+            extras: extras ? (typeof extras === 'string' ? extras.split(',') : [].concat(extras)) : []
         };
 
         // Process media files
@@ -186,7 +194,9 @@ const handlePropertyListing = async (req, res) => {
 
         // Process images
         if (req.files && req.files.images) {
-            for (let file of req.files.images) {
+            const imagesArray = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+            
+            for (let file of imagesArray) {
                 // Validate image file size
                 if (file.size > 10 * 1024 * 1024) {
                     return res.status(400).json({ 
@@ -231,14 +241,16 @@ const handlePropertyListing = async (req, res) => {
 
         // Process videos
         if (req.files && req.files.videos) {
-            if (req.files.videos.length > 1) {
+            const videosArray = Array.isArray(req.files.videos) ? req.files.videos : [req.files.videos];
+            
+            if (videosArray.length > 1) {
                 return res.status(400).json({ 
                     success: false, 
                     message: "Only one video allowed per property" 
                 });
             }
 
-            const videoFile = req.files.videos[0];
+            const videoFile = videosArray[0];
             
             if (videoFile.size > 50 * 1024 * 1024) {
                 return res.status(400).json({ 
@@ -288,22 +300,22 @@ const handlePropertyListing = async (req, res) => {
             });
         }
 
-        // Create the property WITH landlord info attached
+        // Create the property WITH nested structure
         const property = new Property({
-            // Basic property info
+            // Basic property info (top-level fields)
             title,
             description,
             price: parseFloat(price),
             address,
             city,
             state,
-            country,
+            country: country || 'Nigeria',
             apartmentType,
-            unitNumber,
-            features,
+            unitNumber: unitNumber || '',
+            features, // Nested object created above
             apartmentCount: parseInt(apartmentCount) || 1,
             
-            // Media
+            // Media (nested object)
             media,
             
             // Admin info
@@ -313,7 +325,7 @@ const handlePropertyListing = async (req, res) => {
             // Status
             status: 'available',
             
-            // Landlord/House Owner Information (ATTACHED TO PROPERTY)
+            // Landlord/House Owner Information (nested structure)
             landlordInfo: {
                 personalInfo: {
                     fullName: landlordFullName,
@@ -353,7 +365,7 @@ const handlePropertyListing = async (req, res) => {
                 verified: false
             },
             
-            // Management Info
+            // Management Info (nested structure)
             managementInfo: {
                 commissionRate: parseFloat(commissionRate) || 10.0,
                 managementFee: parseFloat(managementFee) || 0,
