@@ -1,6 +1,8 @@
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import User from '../models/userModel.js';
+
+const dotenv = require('dotenv');
+const mongoose = require('mongoose');
+const User = require('../models/userModel');
+const bcrypt = require('bcryptjs');
 
 dotenv.config();
 
@@ -20,11 +22,14 @@ const setupFirstAdmin = async () => {
       return;
     }
 
+
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
+
     // Create super admin (plain password; pre-save hook will hash it)
     const superAdmin = new User({
       fullName: 'Super Administrator',
       email: adminEmail,
-      password: adminPassword,
+      password: hashedPassword,
       role: 'super_admin',
       isVerified: true,
       isEmailVerified: true,

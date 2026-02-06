@@ -81,10 +81,12 @@ const handleGetAllProperty = async (req, res) => {
 const handlePropertyListing = async (req, res) => {
     try {
         // Check if user is admin
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({
-                success: false,
-                message: "Only admins can list properties"
+        const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+        
+        if (!isAdmin) {
+            return res.status(403).json({ 
+                success: false, 
+                message: "Only admins can list property" 
             });
         }
 
