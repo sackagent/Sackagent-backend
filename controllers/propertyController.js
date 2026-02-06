@@ -380,13 +380,14 @@ const handlePropertyListing = async (req, res) => {
 
         // Log the action in history
         const history = new History({
-            action: "listProperty",
-            user: req.user._id,
-            property: property._id,
-            details: {
-                landlordName: landlordFullName,
-                commissionRate: property.managementInfo.commissionRate
-            }
+            action: "New Property listed",
+            userId: req.user._id,
+            propertyId: property._id,
+            startDate: new Date(),
+            notes: "History recorded",
+            status: "Active"
+
+
         });
         await history.save();
 
