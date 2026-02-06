@@ -385,7 +385,7 @@ const handlePropertyListing = async (req, res) => {
             propertyId: property._id,
             startDate: new Date(),
             notes: "History recorded",
-            status: "Active"
+            status: "active"
 
 
         });
