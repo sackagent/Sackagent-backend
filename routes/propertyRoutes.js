@@ -18,12 +18,19 @@ const {
     removeFavourite,
     getFavourite
 } = require('../controllers/propertyController');
+const { uploadPropertyMedia } = require('../utils/multer');
 
 
 
 
 // Property routes
-router.post('/list-property', protect, authorizeRoles(['admin', 'super_admin']), handlePropertyListing);
+router.post('/list-property', protect, authorizeRoles(['admin', 'super_admin']),
+      uploadPropertyMedia.fields([
+    { name: 'images', maxCount: 10 },
+    { name: 'videos', maxCount: 1 }
+  ]),
+    handlePropertyListing);
+    
 router.get('/all-properties', protect, authorizeRoles(['admin', 'super_admin']), handleGetAllProperty);
 router.get('/public', handleShowAllPropertiesToTenant);
 router.get('/public/:id', handleShowPropertiesToTenantById);
