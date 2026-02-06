@@ -2,6 +2,7 @@
 const Property = require('../models/propertyModel');
 const History = require('../models/historyModel');
 const User = require('../models/userModel');
+const cloudinary = require('../utils/cloudinary');
 
 
 // Get all properties without any checks but with visibility control
